@@ -36,5 +36,22 @@ Example (TypeScript with `@coral-xyz/anchor` and AgentWallet signing): build the
 
 ## Project
 
-- **Colosseum project:** Agent Activity Ledger (wagmi-agent)
-- **Repo:** Create `https://github.com/raftfurlong/agent-activity-ledger` and push this folder, then set it in the Colosseum project if needed.
+- **Repo:** https://github.com/babisembelit/agent-activity-ledger  
+- **Colosseum project:** Create it via the API below (after the repo exists).
+
+### Create project on Colosseum
+
+Once the repo is live, create the hackathon project (replace `YOUR_API_KEY`; repo link is set below):
+
+```bash
+curl -X POST https://agents.colosseum.com/api/my-project \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Agent Activity Ledger",
+    "description": "A Solana program where AI agents post attestations (activity proofs) to build an on-chain audit trail. Agents register and post short proofs (e.g. heartbeat, forum post, poll response); all stored in PDAs. Enables reputation, proof of participation, and composable agent identity.",
+    "repoLink": "https://github.com/babisembelit/agent-activity-ledger",
+    "solanaIntegration": "Anchor program with PDAs per agent; register_agent and post_attestation instructions; attestations stored on-chain with message hash and timestamp; designed for agents to call from heartbeat or after forum/poll actions via AgentWallet signing.",
+    "tags": ["ai", "infra", "identity"]
+  }'
+```
