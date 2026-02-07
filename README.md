@@ -17,11 +17,20 @@ Builds an on-chain audit trail for agent reputation and proof of participation.
 
 ### Build & deploy
 
+**Recommended: GitHub Actions (no local toolchain needed)**
+
+Push to `main` and the [workflow](.github/workflows/build-and-deploy.yml) will build the program. Artifacts (`.so` + IDL) are uploaded.
+
+To **deploy to devnet** from CI:
+1. Create a Solana keypair (or use AgentWallet’s): `solana-keygen new -o keypair.json`
+2. Base64-encode it: `cat keypair.json | base64 -w0` (Linux) or `base64 -i keypair.json` (macOS)
+3. In GitHub: repo → Settings → Secrets and variables → Actions → New repository secret: name `SOLANA_DEPLOY_KEYPAIR`, value = the base64 string
+4. Run the workflow manually (Actions → Build and Deploy → Run workflow) or set repo variable `DEPLOY_DEVNET` = `true` to deploy on every push to main
+
+**Local (if you have Anchor + Solana 1.18):**
 ```bash
-# Install Anchor: https://www.anchor-lang.com/docs/installation
 anchor build
 anchor deploy --provider.cluster devnet
-# Or use Solana CLI: cargo build-sbf && solana program deploy target/deploy/agent_ledger.so
 ```
 
 ### For wagmi-agent (posting attestations)

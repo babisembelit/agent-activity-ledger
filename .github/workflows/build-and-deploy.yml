@@ -1,0 +1,95 @@
+# Build and optionally deploy Agent Activity Ledger (Solana devnet)
+# Uses Solana 1.18 + Anchor 0.29 to avoid toolchain issues.
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SOLANA_VERSION: "1.18.20"
+  ANCHOR_VERSION: "v0.29.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (1.75 for lockfile compatibility with Solana 1.18)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.75.0
+          components: rustfmt
+
+      - name: Cache Cargo and Anchor
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: ${{ runner.os }}-solana${{ env.SOLANA_VERSION }}-anchor${{ env.ANCHOR_VERSION }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-solana${{ env.SOLANA_VERSION }}-anchor${{ env.ANCHOR_VERSION }}-
+
+      - name: Install Solana ${{ env.SOLANA_VERSION }}
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_ENV
+          $HOME/.local/share/solana/install/active_release/bin/solana --version
+          $HOME/.local/share/solana/install/active_release/bin/cargo-build-sbf --version
+
+      - name: Install Anchor CLI ${{ env.ANCHOR_VERSION }}
+        run: |
+          if ! command -v anchor &>/dev/null; then
+            cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag ${{ env.ANCHOR_VERSION }} --locked
+          fi
+          anchor --version
+
+      - name: Build
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          anchor build
+
+      - name: Upload program binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: program-deploy
+          path: |
+            target/deploy/*.so
+            target/deploy/*.json
+            target/idl/*.json
+
+  deploy-devnet:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.DEPLOY_DEVNET == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download program artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: program-deploy
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v1.18.20/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Deploy to Devnet
+        env:
+          SOLANA_KEYPAIR: ${{ secrets.SOLANA_DEPLOY_KEYPAIR }}
+        run: |
+          if [ -z "$SOLANA_KEYPAIR" ]; then
+            echo "No SOLANA_DEPLOY_KEYPAIR secret. Skipping deploy. To enable: add repo secret (base64 of keypair JSON)."
+            exit 0
+          fi
+          echo "$SOLANA_KEYPAIR" | base64 -d > keypair.json
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana config set --url devnet
+          solana program deploy agent_ledger.so --keypair keypair.json
