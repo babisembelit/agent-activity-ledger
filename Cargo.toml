@@ -3,3 +3,10 @@ members = [
     "programs/*"
 ]
 resolver = "2"
+
+[profile.release]
+overflow-checks = true
+
+[patch.crates-io]
+# Replace with edition-2021 compatible crate (avoids edition2024 in Cargo 1.84)
+constant_time_eq = { path = "constant_time_eq_patch" }
